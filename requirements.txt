@@ -13,3 +13,10 @@ contextily
 pyarrow
 pystac_client
 copernicusmarine
+duckdb
+lonboard
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+pydantic

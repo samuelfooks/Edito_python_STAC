@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parquet Explorer - Data Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+        
+        .nav-links {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .stat-item {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-item strong {
+            display: block;
+            color: #667eea;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-item span {
+            font-size: 1.5rem;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        th:hover {
+            background: #e9ecef;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .type-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .type-double, .type-float {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .type-int, .type-bigint {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .type-string, .type-varchar {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        
+        .type-boolean {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 4px solid #c62828;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 1rem;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button.secondary {
+            background: #6c757d;
+        }
+        
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        
+        .quick-explore {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .quick-explore-card {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-explore-card:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        
+        .quick-explore-card h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .quick-explore-card p {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        input {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Data Explorer</h1>
+        <p>Browse, filter, and explore your parquet data</p>
+        <div class="nav-links">
+            <a href="/">Interactive Map</a>
+            <a href="/query">SQL Query</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Data Source</h2>
+            <p style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;">
+                Supports Parquet files (.parquet) and DuckDB databases (.duckdb, .db)
+            </p>
+            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+                <input type="text" id="dataSourceUrl" placeholder="Enter URL to parquet file or DuckDB database" style="flex: 1;">
+                <select id="dataType" style="width: 150px;">
+                    <option value="">Auto-detect</option>
+                    <option value="parquet">Parquet File</option>
+                    <option value="duckdb">DuckDB Database</option>
+                </select>
+                <button id="loadDataSourceBtn" onclick="loadDataSource()">Load</button>
+            </div>
+            <div id="dataSourceInfo" style="padding: 0.75rem; background: #f8f9fa; border-radius: 4px; font-size: 0.9rem; color: #666;">
+                <strong>Current source:</strong> <span id="currentUrl">Loading...</span><br>
+                <strong>Type:</strong> <span id="currentType">-</span>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Quick Explore</h2>
+            <div class="quick-explore" id="quickExplore">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading column information...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Dataset Statistics</h2>
+            <div id="statsLoading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading statistics...</p>
+            </div>
+            <div id="statsError" class="error" style="display: none;"></div>
+            <div id="statsContent" style="display: none;">
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Schema Information</h2>
+            <div id="schemaLoading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading schema...</p>
+            </div>
+            <div id="schemaError" class="error" style="display: none;"></div>
+            <div id="schemaContent" style="display: none;">
+                <p style="margin-bottom: 1rem; color: #666;">
+                    Total columns: <strong id="columnCount">0</strong>
+                </p>
+                <table id="schemaTable">
+                    <thead>
+                        <tr>
+                            <th>Column Name</th>
+                            <th>Data Type</th>
+                            <th>Nullable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schemaBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadDataSource() {
+            const urlInput = document.getElementById('dataSourceUrl');
+            const loadBtn = document.getElementById('loadDataSourceBtn');
+            const dataTypeSelect = document.getElementById('dataType');
+            const url = urlInput.value.trim();
+            const dataType = dataTypeSelect.value || null;
+            
+            if (!url) {
+                alert('Please enter a data source URL');
+                return;
+            }
+            
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch('/api/load-data-source', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        url: url,
+                        data_type: dataType
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to load data source');
+                }
+                
+                if (data.success) {
+                    alert(data.message || 'Data source loaded successfully!');
+                    document.getElementById('currentUrl').textContent = data.url;
+                    document.getElementById('currentType').textContent = data.type.toUpperCase();
+                    urlInput.value = data.url;
+                    // Reload all data
+                    loadCurrentDataSourceInfo();
+                    loadStats();
+                    loadSchema();
+                    loadQuickExplore();
+                } else {
+                    alert('Failed to load data source: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error loading data source: ' + error.message);
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Load';
+            }
+        }
+        
+        async function loadCurrentDataSourceInfo() {
+            try {
+                const response = await fetch('/api/data-source-info');
+                const data = await response.json();
+                document.getElementById('currentUrl').textContent = data.url;
+                document.getElementById('currentType').textContent = data.type ? data.type.toUpperCase() : '-';
+                document.getElementById('dataSourceUrl').value = data.url;
+            } catch (error) {
+                console.error('Error loading data source info:', error);
+            }
+        }
+        
+        async function loadQuickExplore() {
+            const quickExploreEl = document.getElementById('quickExplore');
+            
+            try {
+                const response = await fetch('/api/columns');
+                const data = await response.json();
+                
+                if (!data.columns || data.columns.length === 0) {
+                    quickExploreEl.innerHTML = '<p style="color: #666;">No columns found</p>';
+                    return;
+                }
+                
+                let html = '';
+                
+                // Quick view all data
+                html += `
+                    <div class="quick-explore-card" onclick="window.location.href='/query'">
+                        <h3>🔍 View All Data</h3>
+                        <p>Browse all ${data.columns.length} columns</p>
+                    </div>
+                `;
+                
+                // Quick map view if geospatial
+                if (data.has_geospatial) {
+                    html += `
+                        <div class="quick-explore-card" onclick="window.location.href='/?autoLoad=true'">
+                            <h3>🗺️ View on Map</h3>
+                            <p>Visualize geospatial data</p>
+                        </div>
+                    `;
+                }
+                
+                // Show first few columns as examples
+                const sampleCols = data.columns.slice(0, Math.min(4, data.columns.length));
+                sampleCols.forEach(col => {
+                    html += `
+                        <div class="quick-explore-card" onclick="exploreColumn('${col}')">
+                            <h3>📋 ${col}</h3>
+                            <p>Explore this column</p>
+                        </div>
+                    `;
+                });
+                
+                quickExploreEl.innerHTML = html;
+            } catch (error) {
+                quickExploreEl.innerHTML = `<div class="error">Error loading columns: ${error.message}</div>`;
+            }
+        }
+        
+        function exploreColumn(columnName) {
+            window.location.href = `/query?column=${encodeURIComponent(columnName)}`;
+        }
+        
+        async function loadStats() {
+            const loadingEl = document.getElementById('statsLoading');
+            const errorEl = document.getElementById('statsError');
+            const contentEl = document.getElementById('statsContent');
+            const gridEl = document.getElementById('statsGrid');
+            
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'none';
+                contentEl.style.display = 'block';
+                
+                const stats = data.stats;
+                gridEl.innerHTML = `
+                    <div class="stat-item">
+                        <strong>Total Rows</strong>
+                        <span>${parseInt(stats.total_rows).toLocaleString()}</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Unique Datasets</strong>
+                        <span>${parseInt(stats.unique_datasets).toLocaleString()}</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Unique Species</strong>
+                        <span>${parseInt(stats.unique_species).toLocaleString()}</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Latitude Range</strong>
+                        <span>${parseFloat(stats.min_lat).toFixed(2)} to ${parseFloat(stats.max_lat).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Longitude Range</strong>
+                        <span>${parseFloat(stats.min_lon).toFixed(2)} to ${parseFloat(stats.max_lon).toFixed(2)}</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Query Time</strong>
+                        <span>${data.query_time.toFixed(3)}s</span>
+                    </div>
+                `;
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'block';
+                errorEl.textContent = 'Error loading statistics: ' + error.message;
+            }
+        }
+        
+        async function loadSchema() {
+            const loadingEl = document.getElementById('schemaLoading');
+            const errorEl = document.getElementById('schemaError');
+            const contentEl = document.getElementById('schemaContent');
+            const bodyEl = document.getElementById('schemaBody');
+            const countEl = document.getElementById('columnCount');
+            
+            try {
+                const response = await fetch('/api/schema');
+                const data = await response.json();
+                
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'none';
+                contentEl.style.display = 'block';
+                
+                countEl.textContent = data.total_columns;
+                
+                bodyEl.innerHTML = data.columns.map(col => {
+                    const typeClass = getTypeClass(col.type);
+                    return `
+                        <tr>
+                            <td><strong>${col.name}</strong></td>
+                            <td><span class="type-badge ${typeClass}">${col.type}</span></td>
+                            <td>${col.null}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'block';
+                errorEl.textContent = 'Error loading schema: ' + error.message;
+            }
+        }
+        
+        function getTypeClass(type) {
+            const typeLower = type.toLowerCase();
+            if (typeLower.includes('double') || typeLower.includes('float')) return 'type-double';
+            if (typeLower.includes('int') || typeLower.includes('bigint')) return 'type-int';
+            if (typeLower.includes('string') || typeLower.includes('varchar')) return 'type-string';
+            if (typeLower.includes('bool')) return 'type-boolean';
+            return '';
+        }
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            loadCurrentDataSourceInfo();
+            loadStats();
+            loadSchema();
+            loadQuickExplore();
+        });
+    </script>
+</body>
+</html>
