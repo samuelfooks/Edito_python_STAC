@@ -847,7 +847,9 @@ function DataViewer({
         }, 'Total Rows'),
         React.createElement('div', {
           style: { fontWeight: '600', color: '#0f172a' }
-        }, currentData.total_rows.toLocaleString())
+        }, currentData.total_rows !== null 
+          ? currentData.total_rows.toLocaleString() 
+          : '~' + (currentPage * pageSize + currentData.data.length).toLocaleString() + '+')
       ),
       React.createElement('div', null,
         React.createElement('div', {
@@ -889,8 +891,10 @@ function DataViewer({
       React.createElement('div', {
         style: { color: '#6b7280', fontSize: '0.9rem' }
       },
-        `Showing ${currentPage * pageSize + 1} to ${Math.min((currentPage + 1) * pageSize, currentData.total_rows)} of ${currentData.total_rows.toLocaleString()} rows`,
-        currentData.limited && ' (limited)'
+        currentData.total_rows !== null
+          ? `Showing ${currentPage * pageSize + 1} to ${Math.min((currentPage + 1) * pageSize, currentData.total_rows)} of ${currentData.total_rows.toLocaleString()} rows`
+          : `Showing ${currentPage * pageSize + 1} to ${currentPage * pageSize + currentData.data.length} rows${currentData.limited ? ' (more available)' : ''}`,
+        currentData.limited && currentData.total_rows !== null && ' (limited)'
       ),
       React.createElement('div', {
         style: { display: 'flex', gap: '8px' }
@@ -903,7 +907,9 @@ function DataViewer({
         React.createElement('button', {
           className: 'btn btn-secondary',
           onClick: () => onPageChange(currentPage + 1),
-          disabled: !currentData.limited || (currentPage + 1) * pageSize >= currentData.total_rows
+          disabled: currentData.total_rows !== null 
+            ? (!currentData.limited || (currentPage + 1) * pageSize >= currentData.total_rows)
+            : !currentData.limited
         }, 'Next')
       )
     )
@@ -1542,9 +1548,32 @@ function App() {
   }
 
   return React.createElement('div', { className: 'container' },
-    React.createElement('div', { className: 'header' },
-      React.createElement('h1', null, 'Parquet Explorer'),
-      React.createElement('p', null, 'Explore your data with powerful filtering, SQL queries, and map visualization!')
+    React.createElement('div', { 
+      className: 'header',
+      style: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        borderRadius: '12px',
+        padding: '32px',
+        marginBottom: '24px',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+        border: 'none'
+      }
+    },
+      React.createElement('h1', { 
+        style: { 
+          color: 'white', 
+          fontSize: '2rem', 
+          fontWeight: '700', 
+          marginBottom: '8px' 
+        } 
+      }, 'Parquet Explorer'),
+      React.createElement('p', { 
+        style: { 
+          color: 'rgba(255, 255, 255, 0.9)', 
+          fontSize: '1.1rem' 
+        } 
+      }, 'Explore your data with powerful filtering, SQL queries, and map visualization!')
     ),
 
     React.createElement(DatabaseSelector, {

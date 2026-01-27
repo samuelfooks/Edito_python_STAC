@@ -1,94 +1,95 @@
-# Minka DMT Web Explorer
+# Viewerapp Frontend Assets
 
-A web-based data viewer for exploring marine survey data stored in DuckDB databases and Parquet files.
+This directory contains the frontend assets for the Parquet Explorer FastAPI application. These files are served as static assets by the FastAPI backend.
 
 ## Overview
 
-The Minka DMT Web Explorer is a single-page React application that provides an intuitive interface for browsing, filtering, and querying marine data. It runs entirely in the browser using DuckDB WASM for data processing.
-
-## Features
-
-- **Database Connection**: Connect to remote DuckDB databases or Parquet files via URL
-- **Local File Support**: Upload and explore local DuckDB, Parquet, CSV, or JSON files
-- **Table Browser**: Visual grid showing all available tables with row counts
-- **Data Viewer**: Interactive table with sorting, searching, and filtering
-- **Column Selection**: Choose which columns to display
-- **Advanced Filtering**: Add custom filters with various operators (=, !=, >, <, LIKE, etc.)
-- **SQL Editor**: Execute custom SQL queries
-- **Data Export**: Export filtered data to CSV
-- **Real-time Search**: Search across all columns simultaneously
+The viewerapp is no longer a standalone application. It is now integrated into the FastAPI backend (`parquet_explorer_app.py`) and serves as the frontend UI for exploring parquet files and DuckDB databases.
 
 ## File Structure
 
 ```
 viewerapp/
-├── index.html          # Main HTML file with React setup
 ├── css/
-│   └── styles.css      # Application styling
+│   └── styles.css      # Application styling (shared across all components)
 └── js/
-    ├── app.js          # Main React application (all components inline)
-    ├── duckdb_client.js # DuckDB WASM client for data operations
-    ├── components/     # Unused component files (legacy)
-    └── ui/             # Unused UI files (legacy)
+    ├── fastapi_client.js    # FastAPI backend client (exports FastAPIClient class)
+    └── integrated_app.js    # Main React application (all components inline)
 ```
+
+## Active Files
+
+### `css/styles.css`
+- Contains all styling for the application
+- Referenced by `templates/viewer.html`
+- Includes styles for tables, cards, buttons, filters, and map components
+
+### `js/fastapi_client.js`
+- FastAPI backend client module
+- Exports `FastAPIClient` class that communicates with FastAPI endpoints
+- Replaces the old DuckDB WASM client
+- Sets `window.FastAPIClient` for use by `integrated_app.js`
+- Methods include: `connectToDatabase`, `getTables`, `getTableData`, `executeQuery`, `getFastMetadata`, etc.
+
+### `js/integrated_app.js`
+- Main React application (React 18)
+- All components are defined inline using `React.createElement()` (no JSX)
+- Components include:
+  - `TabNavigation` - Tab switcher for Table/Map views
+  - `DatabaseSelector` - Data source connection interface
+  - `TableBrowser` - Grid of available tables
+  - `DataViewer` - Main data display with filtering, sorting, pagination
+  - `FilterPanel` - Advanced filtering interface
+  - `ColumnSelector` - Column visibility controls
+  - `SqlEditor` - Custom SQL query interface
+  - `SampleQueries` - Example queries display
+  - `MapViewerInline` - Geospatial map visualization (Leaflet)
+- Uses `window.FastAPIClient` to communicate with backend
+- Loaded by `templates/viewer.html` via Babel transformation
 
 ## Architecture
 
-The application uses a simplified architecture with just two main JavaScript files:
+The application follows a client-server architecture:
 
-- **`app.js`**: Contains all React components written using `React.createElement()` (no JSX)
-- **`duckdb_client.js`**: Handles DuckDB WASM initialization and all database operations
+1. **Backend**: FastAPI server (`parquet_explorer_app.py`)
+   - Serves `templates/viewer.html` at `/`
+   - Mounts `viewerapp/` as static files at `/viewerapp`
+   - Provides REST API endpoints for data operations
+   - Uses DuckDB (server-side) for querying parquet files
 
-All components are defined inline in `app.js`:
-- `DatabaseSelector` - Connection interface
-- `SchemasDisplay` - Shows available schemas
-- `SqlEditor` - Custom SQL query interface
-- `TableBrowser` - Grid of available tables
-- `DataViewer` - Main data display with controls
-- `FilterPanel` - Advanced filtering interface
-- `ColumnSelector` - Column visibility controls
-- `DataTable` - Data table with sorting
+2. **Frontend**: React SPA
+   - `templates/viewer.html` - Entry point HTML
+   - `integrated_app.js` - React application
+   - `fastapi_client.js` - API client
+   - `styles.css` - Styling
+
+3. **Data Flow**:
+   - User connects to data source → `FastAPIClient.connectToDatabase()` → `/api/load-data-source`
+   - User selects table → `FastAPIClient.getTableData()` → `/api/table-data`
+   - User adds filters → Applied via `/api/table-data` with filter parameters
+   - User views map → `fetch('/api/map-data')` → Returns geospatial points
 
 ## Usage
 
-1. **Open** `index.html` in a web browser
-2. **Connect** to a data source:
-   - Enter a URL to a remote DuckDB database or Parquet file
-   - Or select a local file using the file picker
-3. **Browse** available tables in the grid
-4. **Click** on a table to view its data
-5. **Use** the search box to find specific values
-6. **Add filters** to narrow down results
-7. **Select columns** to show/hide specific fields
-8. **Execute SQL** queries for custom analysis
-9. **Export** filtered data to CSV
+The viewerapp is automatically served by the FastAPI backend. To use it:
 
-## Supported Data Sources
+1. Start the FastAPI server: `python parquet_explorer_app.py`
+2. Navigate to `http://localhost:8000/` in your browser
+3. Connect to a parquet file or DuckDB database
+4. Explore data using the table viewer or map viewer tabs
 
-- **DuckDB databases** (.duckdb files)
-- **Parquet files** (.parquet files)
-- **CSV files** (.csv files)
-- **JSON files** (.json files)
-- **Remote URLs** (HTTP/HTTPS/S3)
+## Dependencies
 
-## Technical Details
+- React 18 (loaded from CDN)
+- ReactDOM 18 (loaded from CDN)
+- Babel Standalone (for JSX transformation)
+- Leaflet (for map visualization, loaded from CDN)
 
-- **Frontend**: React 18 with Babel for JSX transformation
-- **Database Engine**: DuckDB WASM for client-side data processing
-- **Styling**: Custom CSS with modern design
-- **Icons**: Lucide icons
-- **Data Format**: Apache Arrow for efficient data transfer
+## Notes
 
-## Browser Requirements
-
-- Modern browser with ES6+ support
-- WebAssembly support
-- Cross-Origin Isolation (COI) for optimal performance
-
-## Development Notes
-
+- All React components are defined inline in `integrated_app.js` (no separate component files)
 - The application uses `React.createElement()` instead of JSX for simplicity
-- All components are defined in a single file (`app.js`)
-- The `components/` and `ui/` directories contain unused legacy files
-- DuckDB WASM handles all data processing client-side
 - No build process required - runs directly in the browser
+- The old standalone DuckDB WASM version has been removed
+
+

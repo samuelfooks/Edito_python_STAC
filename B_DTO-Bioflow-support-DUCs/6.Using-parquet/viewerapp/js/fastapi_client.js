@@ -100,7 +100,8 @@ export class FastAPIClient {
         sortBy = null,
         sortOrder = 'asc',
         columns = null,
-        filters = []
+        filters = [],
+        calculate_count = false
       } = options;
 
       const response = await fetch(`${this.baseUrl}/api/table-data`, {
@@ -115,7 +116,8 @@ export class FastAPIClient {
           sort_by: sortBy,
           sort_order: sortOrder,
           limit: limit,
-          offset: offset
+          offset: offset,
+          calculate_count: calculate_count
         })
       });
 
@@ -130,7 +132,7 @@ export class FastAPIClient {
       return {
         data: data.data || [],
         columns: data.columns || [],
-        total_rows: data.total_rows || 0,
+        total_rows: data.total_rows ?? null,  // null when not calculated
         returned_rows: data.returned_rows || 0,
         limited: data.has_more || false
       };

@@ -153,6 +153,8 @@ class TableDataRequest(BaseModel):
     # Pagination
     limit: Optional[int] = 1000
     offset: Optional[int] = 0
+    # Whether to calculate total row count (expensive for filtered queries)
+    calculate_count: Optional[bool] = False
 
 
 def detect_data_type(url: str) -> str:
@@ -249,22 +251,22 @@ async def shutdown_event():
     print("✓ DuckDB connection closed")
 
 
-@app.get("/", response_class=RedirectResponse)
-async def root():
-    """Redirect root to unified viewer"""
-    return RedirectResponse(url="/viewer", status_code=301)
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Unified viewer app - this IS the application"""
+    return templates.TemplateResponse("viewer.html", {"request": request})
 
 
 @app.get("/explorer", response_class=RedirectResponse)
 async def explorer():
-    """Redirect explorer to unified viewer"""
-    return RedirectResponse(url="/viewer", status_code=301)
+    """Redirect explorer to unified app"""
+    return RedirectResponse(url="/", status_code=301)
 
 
 @app.get("/query", response_class=RedirectResponse)
 async def query_page():
-    """Redirect query page to unified viewer"""
-    return RedirectResponse(url="/viewer", status_code=301)
+    """Redirect query page to unified app"""
+    return RedirectResponse(url="/", status_code=301)
 
 
 @app.get("/api/schema")
@@ -591,6 +593,12 @@ async def get_map_data(
                         # Build condition based on operator
                         operator = filter_req["operator"]
                         value = filter_req.get("value", "")
+
+                        # Skip filters with empty values
+                        if not value or (isinstance(value, str) and value.strip() == ""):
+                            continue
+
+                        value = value.strip() if isinstance(value, str) else value
                         escaped_value = str(value).replace("'", "''")
 
                         if operator == "=":
@@ -617,7 +625,7 @@ async def get_map_data(
                         elif operator == "NOT LIKE":
                             conditions.append(
                                 f'"{matching_col}" NOT LIKE \'%{escaped_value}%\'')
-            except Exception as e:
+            except Exception:
                 # If filters_json is invalid, just ignore it
                 pass
 
@@ -996,7 +1004,6 @@ async def get_table_data(request: TableDataRequest):
 
         # Get schema once (cached) and reuse throughout
         schema_info = get_cached_schema(table_ref)
-        valid_columns_set = set(schema_info["column_name"].str.lower())
         all_columns_list = schema_info["column_name"].tolist()
 
         # Build SELECT clause
@@ -1047,6 +1054,10 @@ async def get_table_data(request: TableDataRequest):
                 if not filter_req.column or not filter_req.operator:
                     continue
 
+                # Skip filters with empty values
+                if not filter_req.value or (isinstance(filter_req.value, str) and filter_req.value.strip() == ""):
+                    continue
+
                 # Find matching column (case-insensitive)
                 col_lower = filter_req.column.lower()
                 matching_col = None
@@ -1060,7 +1071,8 @@ async def get_table_data(request: TableDataRequest):
 
                 # Build condition based on operator
                 operator = filter_req.operator.upper()
-                value = filter_req.value
+                value = filter_req.value.strip() if isinstance(
+                    filter_req.value, str) else filter_req.value
 
                 if operator in ["LIKE", "NOT LIKE"]:
                     # Escape single quotes before using in f-string
@@ -1090,6 +1102,7 @@ async def get_table_data(request: TableDataRequest):
 
         where_clause = ""
         if where_conditions:
+            # Combine conditions with AND (filters are ANDed together, search is ORed within itself)
             where_clause = "WHERE " + " AND ".join(where_conditions)
 
         # Build ORDER BY clause - use cached schema
@@ -1126,8 +1139,9 @@ async def get_table_data(request: TableDataRequest):
         query_time = time.time() - start_time
 
         # Get total count (for pagination info)
-        # Use cached count if available and no filters/search
+        # Skip expensive COUNT(*) for filtered queries unless explicitly requested
         cache_key = get_cache_key(current_data_source, current_data_type)
+        total_rows = None
 
         if not where_clause:
             # No filters - use cached count if available
@@ -1143,25 +1157,39 @@ async def get_table_data(request: TableDataRequest):
                     schema_cache[cache_key] = {}
                 schema_cache[cache_key]["total_rows"] = total_rows
         else:
-            # With filters, always calculate (can't use cached count)
-            count_query = f"SELECT COUNT(*) as count FROM {table_ref} {where_clause}"
-            count_result = conn.execute(count_query).df()
-            total_rows = int(count_result.iloc[0]['count'])
+            # With filters - only calculate if explicitly requested
+            if request.calculate_count:
+                count_query = f"SELECT COUNT(*) as count FROM {table_ref} {where_clause}"
+                count_result = conn.execute(count_query).df()
+                total_rows = int(count_result.iloc[0]['count'])
 
         # Convert to JSON-serializable format with proper type conversion
         data = dataframe_to_dict_records(result_df)
         columns = list(result_df.columns)
+        returned_rows = len(data)
 
-        return JSONResponse(content={
+        # Calculate has_more: if total_rows is None, use returned_rows == limit as indicator
+        if total_rows is not None:
+            has_more = (offset + returned_rows) < total_rows
+        else:
+            # If we got a full page, there might be more (can't know without counting)
+            has_more = returned_rows == limit
+
+        response_data = {
             "data": data,
             "columns": columns,
-            "total_rows": int(total_rows),
-            "returned_rows": len(data),
+            "returned_rows": returned_rows,
             "limit": int(limit),
             "offset": int(offset),
-            "has_more": (offset + len(data)) < total_rows,
+            "has_more": has_more,
             "query_time": float(query_time)
-        })
+        }
+
+        # Only include total_rows if it was calculated
+        if total_rows is not None:
+            response_data["total_rows"] = int(total_rows)
+
+        return JSONResponse(content=response_data)
 
     except HTTPException:
         raise
@@ -1320,14 +1348,14 @@ async def get_example_queries():
 
 @app.get("/table-explorer", response_class=RedirectResponse)
 async def table_explorer():
-    """Redirect table explorer to the new unified viewer"""
-    return RedirectResponse(url="/viewer", status_code=301)
+    """Redirect table explorer to unified app"""
+    return RedirectResponse(url="/", status_code=301)
 
 
-@app.get("/viewer", response_class=HTMLResponse)
-async def viewer(request: Request):
-    """Integrated viewer app with table explorer and map"""
-    return templates.TemplateResponse("viewer.html", {"request": request})
+@app.get("/viewer", response_class=RedirectResponse)
+async def viewer():
+    """Redirect /viewer to unified app root for backward compatibility"""
+    return RedirectResponse(url="/", status_code=301)
 
 
 @app.post("/api/map-data-from-query")

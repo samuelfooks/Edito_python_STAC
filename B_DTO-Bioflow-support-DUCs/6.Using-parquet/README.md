@@ -1,6 +1,10 @@
 # Parquet Explorer with DuckDB and Lonboard
 
-An interactive web application for exploring parquet files using DuckDB for SQL queries and Lonboard for interactive geospatial visualization.
+An interactive, in-development web application for exploring parquet files using DuckDB for SQL queries and Lonboard for interactive geospatial visualization.
+
+## Overview
+
+The parquet explorer wires together a FastAPI backend with DuckDB and PyArrow to query large parquet datasets, then serves Lonboard-powered map tiles and schema/query interfaces so you can inspect the data without downloading it locally. Because the project is still in **DEV**, expect the UI and API to evolve quickly and some features to be rough around the edges.
 
 ## Features
 
@@ -46,13 +50,13 @@ This will:
 Start the web application:
 
 ```bash
-python parquet_explorer_api.py
+python parquet_explorer_app.py
 ```
 
 Or using uvicorn directly:
 
 ```bash
-uvicorn parquet_explorer_api:app --reload --host 0.0.0.0 --port 8000
+uvicorn parquet_explorer_app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Then open your browser to:
@@ -99,7 +103,7 @@ Get example SQL queries.
 ```
 6.Using-parquet/
 ├── using_parquet.py          # Example script with PyArrow, DuckDB, Lonboard
-├── parquet_explorer_api.py   # FastAPI application
+├── parquet_explorer_app.py   # FastAPI application
 ├── pyproject.toml            # uv/pip dependencies
 ├── templates/                # HTML templates
 │   ├── index.html           # Interactive map page
